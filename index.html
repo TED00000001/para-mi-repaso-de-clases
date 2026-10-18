@@ -1,0 +1,612 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="theme-color" content="#020617">
+    <meta name="description" content="Organiza tus sesiones de estudio y consolida lo aprendido con repasos espaciados.">
+    <title>Ritmo de Estudio — Planificador de repasos</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        :root { color-scheme: dark; }
+        body { font-family: 'Inter', sans-serif; background-image: radial-gradient(ellipse at top, rgba(79, 70, 229, .12), transparent 42rem); }
+        button, input, textarea { font: inherit; }
+        button:focus-visible, input:focus-visible, textarea:focus-visible { outline: 2px solid #818cf8; outline-offset: 2px; }
+        ::selection { background: rgba(99, 102, 241, .35); }
+        .surface { background: rgba(15, 23, 42, .88); backdrop-filter: blur(12px); }
+        .review-card { transition: border-color .18s ease, background-color .18s ease, transform .18s ease; }
+        .review-card:hover { transform: translateY(-1px); }
+        @media (prefers-reduced-motion: reduce) { *, *::before, *::after { scroll-behavior: auto !important; transition-duration: .01ms !important; animation-duration: .01ms !important; } }
+    </style>
+</head>
+<body class="bg-slate-950 text-slate-100 min-h-screen flex flex-col antialiased">
+
+    <header class="surface border-b border-slate-800/80 sticky top-0 z-20">
+        <div class="max-w-6xl mx-auto px-4 sm:px-6 py-3.5 flex items-center justify-between gap-4">
+            <div class="flex items-center gap-3">
+                <div class="w-10 h-10 rounded-xl bg-indigo-500/15 border border-indigo-400/20 flex items-center justify-center text-indigo-300 font-bold text-xl">
+                    ✦
+                </div>
+                <div>
+                    <h1 class="text-sm font-bold tracking-tight text-white">Ritmo <span class="text-indigo-300">·</span> Estudio</h1>
+                    <p class="text-[11px] text-slate-400">Tu sistema de aprendizaje espaciado</p>
+                </div>
+            </div>
+            <div class="flex items-center gap-2">
+                <button type="button" onclick="saveToProject()" class="inline-flex items-center gap-2 px-3.5 py-2 rounded-xl bg-indigo-500 hover:bg-indigo-400 text-white text-xs font-semibold transition shadow-lg shadow-indigo-950/40">
+                    <span aria-hidden="true">✓</span><span>Guardar en proyecto</span>
+                </button>
+                <button type="button" onclick="exportHtml()" aria-label="Descargar una copia HTML" title="Descargar una copia HTML" class="inline-flex items-center justify-center w-9 h-9 rounded-xl border border-slate-700 text-slate-300 hover:bg-slate-800 transition">
+                    <span aria-hidden="true">↓</span>
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <main class="flex-1 max-w-6xl w-full mx-auto px-4 sm:px-6 py-8 sm:py-10">
+        <section class="mb-8 sm:mb-10 flex flex-col sm:flex-row sm:items-end sm:justify-between gap-5">
+            <div>
+                <p class="text-xs font-semibold uppercase tracking-[.18em] text-indigo-300 mb-2">Tu espacio de aprendizaje</p>
+                <h2 class="text-3xl sm:text-4xl font-bold tracking-tight text-white">Aprende hoy. <span class="text-slate-400">Recuerda siempre.</span></h2>
+                <p class="text-sm text-slate-400 mt-3 max-w-2xl">Una sesión enfocada y repasos en el momento adecuado convierten el esfuerzo en conocimiento duradero.</p>
+            </div>
+            <div class="text-xs text-slate-500 sm:text-right"><span class="inline-flex items-center gap-2"><span class="w-2 h-2 rounded-full bg-emerald-400"></span>Privado y guardado en este navegador</span></div>
+        </section>
+
+        <section aria-label="Resumen de progreso" class="grid grid-cols-2 xl:grid-cols-4 gap-3 mb-8">
+            <article class="surface rounded-2xl border border-slate-800 p-4 sm:p-5">
+                <p class="text-xs text-slate-400">Temas estudiados</p><p id="totalCoursesCount" class="text-2xl font-bold text-white mt-2">0</p>
+                <p class="text-[11px] text-slate-500 mt-1">sesiones registradas</p>
+            </article>
+            <article class="surface rounded-2xl border border-slate-800 p-4 sm:p-5">
+                <p class="text-xs text-slate-400">Repasos para hoy</p><p id="todayReviewsCount" class="text-2xl font-bold text-amber-300 mt-2">0</p>
+                <p class="text-[11px] text-slate-500 mt-1">incluye los que ya vencieron</p>
+            </article>
+            <article class="surface rounded-2xl border border-slate-800 p-4 sm:p-5">
+                <p class="text-xs text-slate-400">Repasos completados</p><p id="completedReviewsCount" class="text-2xl font-bold text-emerald-300 mt-2">0</p>
+                <p id="reviewProgressLabel" class="text-[11px] text-slate-500 mt-1">0% de tu plan completado</p>
+                <div id="globalProgressTrack" class="h-1 bg-slate-800 rounded-full overflow-hidden mt-3" role="progressbar" aria-label="Progreso global de repasos" aria-valuenow="0" aria-valuemin="0" aria-valuemax="100">
+                    <div id="globalProgressBar" class="h-full bg-gradient-to-r from-indigo-500 to-emerald-400 rounded-full transition-all" style="width: 0%"></div>
+                </div>
+            </article>
+            <article class="surface rounded-2xl border border-slate-800 p-4 sm:p-5">
+                <p class="text-xs text-slate-400">Próximo repaso</p><p id="nextReviewLabel" class="text-lg font-semibold text-indigo-200 mt-2">Sin programar</p>
+                <p id="nextReviewCourse" class="text-[11px] text-slate-500 mt-1 truncate">Registra una sesión para empezar</p>
+            </article>
+        </section>
+
+        <div class="grid grid-cols-1 lg:grid-cols-[minmax(280px,340px)_minmax(0,1fr)] gap-6 lg:gap-8 items-start">
+        
+        <section class="surface p-5 sm:p-6 rounded-2xl border border-slate-800 shadow-xl shadow-black/10 h-fit lg:sticky lg:top-24">
+            <div class="flex items-start gap-3 mb-5">
+                <span class="w-9 h-9 rounded-xl bg-indigo-500/15 text-indigo-300 flex items-center justify-center" aria-hidden="true">＋</span>
+                <div><h2 class="text-base font-semibold text-white">Registrar una sesión</h2>
+                <p class="text-xs text-slate-400 mt-1">Captura lo aprendido y programa sus repasos.</p></div>
+            </div>
+            
+            <form id="studyForm" class="space-y-4">
+                <div>
+                    <label class="block text-xs font-semibold uppercase tracking-wider text-slate-300 mb-1.5" for="courseName">Materia o Tema</label>
+                    <input type="text" id="courseName" required placeholder="Ej. Fundamentos de Python" 
+                        class="w-full px-3.5 py-2.5 text-sm rounded-xl border border-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 bg-slate-800 text-slate-100 placeholder-slate-500">
+                </div>
+
+                <div>
+                    <label class="block text-xs font-semibold uppercase tracking-wider text-slate-300 mb-1.5" for="studyDate">Fecha y Hora de Estudio</label>
+                    <input type="datetime-local" id="studyDate" required
+                        class="w-full px-3.5 py-2.5 text-sm rounded-xl border border-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 bg-slate-800 text-slate-100">
+                </div>
+
+                <div>
+                    <label class="block text-xs font-semibold uppercase tracking-wider text-slate-300 mb-1.5" for="studyNotes">Notas de aprendizaje (opcional)</label>
+                    <textarea id="studyNotes" rows="3" placeholder="¿Qué aprendiste o qué quieres recordar?"
+                        class="w-full px-3.5 py-2.5 text-sm rounded-xl border border-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 bg-slate-800 text-slate-100 placeholder-slate-500 resize-y"></textarea>
+                </div>
+
+                <div>
+                    <label class="block text-xs font-semibold uppercase tracking-wider text-slate-300 mb-1.5">Intervalos de Repaso</label>
+                    <div class="grid grid-cols-4 gap-2 text-xs font-medium text-slate-300 bg-slate-800 p-2 rounded-xl text-center">
+                        <span class="bg-slate-700/70 py-1.5 rounded-lg">1 día</span>
+                        <span class="bg-slate-700/70 py-1.5 rounded-lg">3 días</span>
+                        <span class="bg-slate-700/70 py-1.5 rounded-lg">7 días</span>
+                        <span class="bg-slate-700/70 py-1.5 rounded-lg">30 días</span>
+                    </div>
+                </div>
+
+                <button type="submit" 
+                    class="w-full mt-2 bg-indigo-600 hover:bg-indigo-500 text-white font-medium py-2.5 px-4 rounded-xl text-sm transition-all shadow-md shadow-black/20 active:scale-[0.98]">
+                    Guardar sesión y plan
+                </button>
+            </form>
+        </section>
+
+        <section class="min-w-0 space-y-5">
+            <div class="flex items-center justify-between gap-4 px-1">
+                <div>
+                    <h2 class="text-xl font-semibold text-white">Tu plan de estudio</h2>
+                    <p class="text-xs text-slate-400 mt-1">Marca los repasos al terminarlos para seguir tu progreso.</p>
+                </div>
+            </div>
+
+            <div class="surface rounded-2xl border border-slate-800 p-3 sm:p-4 space-y-3">
+                <label class="relative block">
+                    <span class="sr-only">Buscar en tus temas y notas</span>
+                    <span class="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-500" aria-hidden="true">⌕</span>
+                    <input type="search" id="courseSearch" placeholder="Buscar un tema o una nota..." class="w-full rounded-xl border border-slate-700 bg-slate-950/70 text-sm text-slate-100 placeholder-slate-500 pl-10 pr-4 py-2.5 focus:border-indigo-500">
+                </label>
+                <div class="flex flex-wrap items-center gap-2" role="group" aria-label="Filtrar sesiones">
+                    <button type="button" onclick="filterCourses('all')" id="filterAll" aria-pressed="true" class="filter-button px-3.5 py-2 text-xs font-medium rounded-xl bg-indigo-500/15 text-indigo-200 border border-indigo-400/20 transition">Todas <span id="allCoursesFilterCount" class="ml-1 text-indigo-300">0</span></button>
+                    <button type="button" onclick="filterCourses('today')" id="filterToday" aria-pressed="false" class="filter-button px-3.5 py-2 text-xs font-medium rounded-xl text-slate-400 hover:text-slate-200 hover:bg-slate-800 transition">Hoy y vencidos</button>
+                    <button type="button" onclick="filterCourses('pending')" id="filterPending" aria-pressed="false" class="filter-button px-3.5 py-2 text-xs font-medium rounded-xl text-slate-400 hover:text-slate-200 hover:bg-slate-800 transition">Con repasos pendientes</button>
+                    <button type="button" onclick="filterCourses('completed')" id="filterCompleted" aria-pressed="false" class="filter-button px-3.5 py-2 text-xs font-medium rounded-xl text-slate-400 hover:text-slate-200 hover:bg-slate-800 transition">Completadas</button>
+                    <button type="button" onclick="clearAllData()" class="ml-auto px-3 py-2 text-xs text-slate-500 hover:text-rose-300 transition">Borrar todo</button>
+                </div>
+            </div>
+
+            <div id="coursesList" class="space-y-4">
+                <!-- Dinámicamente inyectado vía JS -->
+            </div>
+            
+            <div id="emptyState" class="hidden text-center py-14 surface rounded-2xl border border-dashed border-slate-700">
+                <div class="w-12 h-12 mx-auto mb-4 rounded-2xl bg-slate-800 flex items-center justify-center text-xl" aria-hidden="true">✦</div>
+                <h3 id="emptyStateTitle" class="text-sm font-semibold text-white">Tu próximo gran avance empieza aquí</h3>
+                <p id="emptyStateMessage" class="text-xs text-slate-400 mt-2 max-w-sm mx-auto">Registra tu primera sesión de estudio y crea un plan para recordar lo aprendido.</p>
+            </div>
+            <p id="appStatus" role="status" aria-live="polite" class="min-h-5 text-xs text-emerald-300"></p>
+
+            <aside class="rounded-2xl border border-slate-800/80 bg-slate-900/40 p-4 sm:p-5">
+                <div class="flex items-start gap-3">
+                    <span class="text-indigo-300 mt-0.5" aria-hidden="true">ⓘ</span>
+                    <div>
+                        <h2 class="text-xs font-semibold text-slate-200">Tus datos son tuyos</h2>
+                        <p class="text-xs leading-relaxed text-slate-400 mt-1">Los cambios se guardan en este navegador. Pulsa <strong class="text-slate-200">Guardar en proyecto</strong> y elige el <code class="text-indigo-300">index.html</code> de tu carpeta: en Chrome o Edge, la aplicación lo actualizará y guardará los cambios siguientes mientras esta página siga abierta. Si tu navegador no admite ese permiso, descargará una copia HTML para que la reemplaces manualmente. GitHub recibirá esos cambios cuando subas o sincronices el archivo.</p>
+                    </div>
+                </div>
+            </aside>
+            <aside class="rounded-2xl border border-indigo-400/15 bg-indigo-500/[.06] p-4 sm:p-5">
+                <p class="text-[10px] font-semibold uppercase tracking-[.16em] text-indigo-300">Una técnica que funciona</p>
+                <p class="text-xs leading-relaxed text-slate-300 mt-2"><strong class="text-slate-100">Recuerdo activo:</strong> antes de releer tus apuntes, cierra el material e intenta explicar el tema con tus propias palabras. Después comprueba qué te faltó.</p>
+            </aside>
+        </section>
+
+        </div>
+    </main>
+
+    <script>
+        const embeddedCourses = []; // embedded-course-data
+        let storageKey = 'spaced_repetition_courses'; // embedded-storage-key
+        let courses = [];
+        let currentFilter = 'all';
+        let currentSearch = '';
+        let storageNotice = '';
+        let projectFileHandle = null;
+        let projectLastSavedHtml = null;
+        let projectSaveQueue = Promise.resolve(true);
+
+        try {
+            const savedCourses = localStorage.getItem(storageKey);
+            if (savedCourses !== null) {
+                const parsedCourses = JSON.parse(savedCourses);
+                if (!Array.isArray(parsedCourses)) throw new Error('Los datos guardados no tienen el formato esperado.');
+                courses = normalizeCourses(parsedCourses);
+            }
+            else courses = normalizeCourses(embeddedCourses);
+        } catch (error) {
+            courses = normalizeCourses(embeddedCourses);
+            storageNotice = 'No se pudieron leer los datos guardados del navegador. Se está usando la información incluida en esta copia HTML, si está disponible.';
+            console.error('No se pudieron leer los datos del planificador:', error);
+        }
+
+        window.addEventListener('DOMContentLoaded', () => {
+            document.getElementById('studyDate').value = getLocalDateTimeValue(new Date());
+            document.getElementById('courseSearch').addEventListener('input', event => {
+                currentSearch = normalizeSearchText(event.target.value);
+                renderCourses();
+            });
+            document.getElementById('coursesList').addEventListener('change', event => {
+                const checkbox = event.target.closest('[data-review-id]');
+                if (checkbox) toggleReview(checkbox.dataset.courseId, Number(checkbox.dataset.reviewId));
+            });
+            document.getElementById('coursesList').addEventListener('click', event => {
+                const deleteButton = event.target.closest('[data-course-action="delete"]');
+                if (deleteButton) deleteCourse(deleteButton.dataset.courseId);
+            });
+            renderCourses();
+            if (storageNotice) setStatus(storageNotice, true);
+        });
+
+        document.getElementById('studyForm').addEventListener('submit', function(e) {
+            e.preventDefault();
+            
+            const name = document.getElementById('courseName').value.trim();
+            const studyDateVal = document.getElementById('studyDate').value;
+            const notes = document.getElementById('studyNotes').value.trim();
+
+            if (!name || !studyDateVal) return;
+
+            const studyDate = new Date(studyDateVal);
+            if (Number.isNaN(studyDate.getTime())) {
+                setStatus('La fecha de estudio no es válida.', true);
+                return;
+            }
+
+            // Calcular repasos: 1, 3, 7 y 30 días después
+            const reviewIntervals = [1, 3, 7, 30];
+            const reviews = reviewIntervals.map((days, index) => {
+                const reviewDate = new Date(studyDate.getTime());
+                reviewDate.setDate(reviewDate.getDate() + days);
+                return {
+                    id: index + 1,
+                    daysAfter: days,
+                    date: reviewDate.toISOString(),
+                    completed: false
+                };
+            });
+
+            const newCourse = {
+                id: typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}-${Math.random().toString(36).slice(2)}`,
+                name: name,
+                notes: notes,
+                studyDate: studyDate.toISOString(),
+                reviews: reviews
+            };
+
+            courses.unshift(newCourse);
+            this.reset();
+            document.getElementById('studyDate').value = getLocalDateTimeValue(new Date());
+            currentFilter = 'all';
+            currentSearch = '';
+            document.getElementById('courseSearch').value = '';
+            updateFilterButtons();
+            saveAndRender('Sesión guardada. Tu plan de repasos ya está listo.');
+        });
+
+        function toggleReview(courseId, reviewId) {
+            const course = courses.find(c => c.id === courseId);
+            if (course) {
+                const review = course.reviews.find(r => r.id === reviewId);
+                if (review) {
+                    review.completed = !review.completed;
+                    saveAndRender(review.completed ? '¡Repaso completado! Vas consolidando lo aprendido.' : 'Repaso marcado como pendiente.');
+                }
+            }
+        }
+
+        function deleteCourse(courseId) {
+            if (confirm("¿Estás seguro de eliminar este curso del planificador?")) {
+                courses = courses.filter(c => c.id !== courseId);
+                saveAndRender('Sesión eliminada.');
+            }
+        }
+
+        function clearAllData() {
+            if (courses.length > 0 && confirm("¿Deseas eliminar todos los registros guardados?")) {
+                courses = [];
+                saveAndRender('Se eliminaron todas las sesiones.');
+            }
+        }
+
+        function filterCourses(filter) {
+            currentFilter = filter;
+            updateFilterButtons();
+            renderCourses();
+        }
+
+        function updateFilterButtons() {
+            document.querySelectorAll('.filter-button').forEach(button => {
+                const isActive = button.id === `filter${currentFilter.charAt(0).toUpperCase()}${currentFilter.slice(1)}`;
+                button.className = `filter-button px-3.5 py-2 text-xs font-medium rounded-xl transition ${isActive ? 'bg-indigo-500/15 text-indigo-200 border border-indigo-400/20' : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800'}`;
+                button.setAttribute('aria-pressed', String(isActive));
+            });
+        }
+
+        function normalizeCourses(data) {
+            if (!Array.isArray(data)) throw new Error('Los datos del planificador no son una lista.');
+            return data.map((course, courseIndex) => {
+                if (!course || typeof course.id !== 'string' || typeof course.name !== 'string'
+                    || typeof course.studyDate !== 'string' || Number.isNaN(new Date(course.studyDate).getTime())
+                    || !Array.isArray(course.reviews)) {
+                    throw new Error(`La sesión ${courseIndex + 1} no tiene un formato válido.`);
+                }
+                const reviews = course.reviews.map((review, reviewIndex) => {
+                    if (!review || !Number.isFinite(Number(review.id)) || !Number.isFinite(Number(review.daysAfter))
+                        || typeof review.date !== 'string' || Number.isNaN(new Date(review.date).getTime())
+                        || typeof review.completed !== 'boolean') {
+                        throw new Error(`El repaso ${reviewIndex + 1} de la sesión ${courseIndex + 1} no tiene un formato válido.`);
+                    }
+                    return { ...review, id: Number(review.id), daysAfter: Number(review.daysAfter) };
+                });
+                return { ...course, notes: typeof course.notes === 'string' ? course.notes : '', reviews };
+            });
+        }
+
+        function saveAndRender(message) {
+            let localStorageFailed = false;
+            try {
+                localStorage.setItem(storageKey, JSON.stringify(courses));
+            } catch (error) {
+                console.error('No se pudieron guardar los datos del planificador:', error);
+                localStorageFailed = true;
+            }
+            renderCourses();
+            if (projectFileHandle) {
+                setStatus('Guardando los cambios en el index.html del proyecto…');
+                queueProjectSave().then(saved => {
+                    if (saved) {
+                        const status = localStorageFailed
+                            ? 'Cambios guardados en el index.html del proyecto. El almacenamiento de este navegador está lleno.'
+                            : 'Cambios guardados en el proyecto.';
+                        setStatus(status, localStorageFailed);
+                    }
+                });
+            } else if (localStorageFailed) {
+                setStatus('El navegador no pudo guardar los cambios. Descarga una copia HTML para conservarlos.', true);
+            } else if (message) {
+                setStatus(message);
+            }
+        }
+
+        function createHtmlSnapshot(html, nextStorageKey) {
+            const safeCourses = JSON.stringify(courses)
+                .replace(/</g, '\\u003c')
+                .replace(/\u2028/g, '\\u2028')
+                .replace(/\u2029/g, '\\u2029');
+            const withCourses = html.replace(
+                /const embeddedCourses = .*?; \/\/ embedded-course-data/,
+                `const embeddedCourses = ${safeCourses}; // embedded-course-data`
+            );
+            const updatedHtml = withCourses.replace(
+                /let storageKey = .*?; \/\/ embedded-storage-key/,
+                `let storageKey = '${nextStorageKey}'; // embedded-storage-key`
+            );
+            if (updatedHtml === html) {
+                throw new Error('No se encontraron las marcas de datos del planificador en el archivo HTML.');
+            }
+            return updatedHtml;
+        }
+
+        function createDataStorageKey() {
+            return `spaced_repetition_courses_${Date.now()}_${Math.random().toString(36).slice(2)}`;
+        }
+
+        function exportHtml() {
+            const updatedHtml = createHtmlSnapshot(document.documentElement.outerHTML, createDataStorageKey());
+            const downloadUrl = URL.createObjectURL(new Blob([updatedHtml], { type: 'text/html;charset=utf-8' }));
+            const link = document.createElement('a');
+            link.href = downloadUrl;
+            link.download = 'ritmo-estudio.html';
+            link.click();
+            setTimeout(() => URL.revokeObjectURL(downloadUrl), 1000);
+            setStatus('Copia HTML descargada con tus sesiones, notas y progreso.');
+        }
+
+        async function saveToProject() {
+            if (!window.showOpenFilePicker) {
+                exportHtml();
+                setStatus('Tu navegador no permite guardar directamente en la carpeta del proyecto. Se descargó el HTML actualizado para reemplazar index.html manualmente.');
+                return;
+            }
+
+            try {
+                const [fileHandle] = await window.showOpenFilePicker({
+                    multiple: false,
+                    types: [{ description: 'Archivo HTML del planificador', accept: { 'text/html': ['.html'] } }]
+                });
+                if (fileHandle.name.toLowerCase() !== 'index.html') {
+                    setStatus('Selecciona el index.html de la carpeta del proyecto para guardar ahí.', true);
+                    return;
+                }
+
+                const currentFile = await fileHandle.getFile();
+                const currentHtml = await currentFile.text();
+                if (!currentHtml.includes('embedded-course-data') || !currentHtml.includes('embedded-storage-key')) {
+                    setStatus('El archivo seleccionado no parece ser el index.html de este planificador. No se modificó.', true);
+                    return;
+                }
+                if (!confirm('Se actualizará el index.html que elegiste con tus sesiones y progreso. ¿Quieres continuar?')) return;
+
+                projectFileHandle = fileHandle;
+                projectLastSavedHtml = currentHtml;
+                storageKey = createDataStorageKey();
+                try {
+                    localStorage.setItem(storageKey, JSON.stringify(courses));
+                } catch (error) {
+                    console.error('No se pudieron copiar los datos al almacenamiento local; se guardarán en el archivo del proyecto:', error);
+                }
+
+                const saved = await queueProjectSave();
+                if (saved) {
+                    setStatus('Cambios guardados en index.html. Los siguientes cambios se guardarán automáticamente mientras esta página siga abierta.');
+                }
+            } catch (error) {
+                if (error.name === 'AbortError') return;
+                console.error('No se pudieron guardar los cambios en el archivo del proyecto:', error);
+                projectFileHandle = null;
+                setStatus('No se pudo guardar directamente en el proyecto. Descarga una copia HTML como alternativa.', true);
+                exportHtml();
+                setStatus('No se pudo editar el archivo elegido. Se descargó una copia HTML actualizada como alternativa.', true);
+            }
+        }
+
+        function queueProjectSave() {
+            if (!projectFileHandle) return Promise.resolve(false);
+            const fileHandle = projectFileHandle;
+            projectSaveQueue = projectSaveQueue.then(async () => {
+                if (projectFileHandle !== fileHandle) return false;
+                const file = await fileHandle.getFile();
+                const currentHtml = await file.text();
+                if (currentHtml !== projectLastSavedHtml) {
+                    throw new Error('El index.html cambió fuera de la aplicación. Vuelve a seleccionarlo para evitar sobrescribir cambios recientes.');
+                }
+                const updatedHtml = createHtmlSnapshot(currentHtml, storageKey);
+                const writable = await fileHandle.createWritable();
+                await writable.write(updatedHtml);
+                await writable.close();
+                projectLastSavedHtml = updatedHtml;
+                return true;
+            }).catch(error => {
+                console.error('No se pudieron guardar los cambios en el proyecto:', error);
+                projectFileHandle = null;
+                setStatus('No se pudo actualizar index.html. Tus datos siguen en este navegador; vuelve a seleccionar el archivo o descarga una copia HTML.', true);
+                return false;
+            });
+            return projectSaveQueue;
+        }
+
+        function formatDate(isoString) {
+            const options = { weekday: 'short', year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' };
+            return new Date(isoString).toLocaleDateString('es-ES', options);
+        }
+
+        function getLocalDateTimeValue(date) {
+            const localDate = new Date(date.getTime() - date.getTimezoneOffset() * 60000);
+            return localDate.toISOString().slice(0, 16);
+        }
+
+        function startOfLocalDay(date) {
+            return new Date(date.getFullYear(), date.getMonth(), date.getDate());
+        }
+
+        function getPendingReviews() {
+            return courses.flatMap(course => (course.reviews || [])
+                .filter(review => !review.completed)
+                .map(review => ({ course, review, date: new Date(review.date) })))
+                .filter(item => !Number.isNaN(item.date.getTime()))
+                .sort((a, b) => a.date - b.date);
+        }
+
+        function setStatus(message, isError = false) {
+            const status = document.getElementById('appStatus');
+            status.textContent = message;
+            status.className = `min-h-5 text-xs ${isError ? 'text-rose-300' : 'text-emerald-300'}`;
+        }
+
+        function renderCourses() {
+            const container = document.getElementById('coursesList');
+            const emptyState = document.getElementById('emptyState');
+            const pendingReviews = getPendingReviews();
+            const completedReviews = courses.reduce((total, course) => total + (course.reviews || []).filter(review => review.completed).length, 0);
+            const totalReviews = pendingReviews.length + completedReviews;
+            const today = startOfLocalDay(new Date());
+            const dueTodayCount = pendingReviews.filter(item => startOfLocalDay(item.date) <= today).length;
+            const completionPercent = totalReviews ? Math.round(completedReviews / totalReviews * 100) : 0;
+            const nextReview = pendingReviews[0];
+
+            document.getElementById('totalCoursesCount').textContent = courses.length;
+            document.getElementById('todayReviewsCount').textContent = dueTodayCount;
+            document.getElementById('completedReviewsCount').textContent = completedReviews;
+            document.getElementById('reviewProgressLabel').textContent = `${completionPercent}% de tu plan completado`;
+            document.getElementById('globalProgressBar').style.width = `${completionPercent}%`;
+            document.getElementById('globalProgressTrack').setAttribute('aria-valuenow', completionPercent);
+            const nextReviewDay = nextReview ? startOfLocalDay(nextReview.date) : null;
+            document.getElementById('nextReviewLabel').textContent = nextReview
+                ? (nextReviewDay < today ? 'Vencido' : nextReviewDay.getTime() === today.getTime() ? 'Hoy' : formatShortDate(nextReview.date))
+                : 'Sin pendientes';
+            document.getElementById('nextReviewCourse').textContent = nextReview ? nextReview.course.name : 'Has completado todos tus repasos';
+            document.getElementById('allCoursesFilterCount').textContent = courses.length;
+
+            let filtered = courses.filter(course => {
+                const hasPending = (course.reviews || []).some(review => !review.completed);
+                if (currentFilter === 'pending' && !hasPending) return false;
+                if (currentFilter === 'completed' && hasPending) return false;
+                if (currentFilter === 'today' && !(course.reviews || []).some(review => !review.completed && startOfLocalDay(new Date(review.date)) <= today)) return false;
+                const searchableText = normalizeSearchText(`${course.name} ${course.notes || ''}`);
+                return searchableText.includes(currentSearch);
+            }).sort((a, b) => {
+                const aNext = (a.reviews || []).filter(review => !review.completed).reduce((earliest, review) => Math.min(earliest, new Date(review.date).getTime()), Infinity);
+                const bNext = (b.reviews || []).filter(review => !review.completed).reduce((earliest, review) => Math.min(earliest, new Date(review.date).getTime()), Infinity);
+                return aNext - bNext;
+            });
+
+            if (filtered.length === 0) {
+                container.innerHTML = '';
+                emptyState.classList.remove('hidden');
+                const hasAnyCourses = courses.length > 0;
+                const emptyCopy = currentFilter === 'today'
+                    ? ['¡Todo al día!', 'No tienes repasos vencidos. Vuelve mañana para seguir reforzando lo aprendido.']
+                    : currentFilter === 'completed' && hasAnyCourses
+                        ? ['Aún no hay sesiones completadas', 'Completa todos los repasos de una sesión y aparecerá aquí.']
+                        : hasAnyCourses
+                            ? ['No encontramos sesiones', 'Prueba otra búsqueda o cambia el filtro para ver tus sesiones.']
+                            : ['Tu próximo gran avance empieza aquí', 'Registra tu primera sesión de estudio y crea un plan para recordar lo aprendido.'];
+                document.getElementById('emptyStateTitle').textContent = emptyCopy[0];
+                document.getElementById('emptyStateMessage').textContent = emptyCopy[1];
+                return;
+            }
+
+            emptyState.classList.add('hidden');
+            container.innerHTML = filtered.map(course => {
+                return `
+                    <article class="surface rounded-2xl border border-slate-800 p-4 sm:p-5 shadow-lg shadow-black/10 hover:border-slate-700 transition">
+                        <div class="flex items-start justify-between gap-4 mb-4">
+                            <div class="min-w-0">
+                                <div class="flex items-center gap-2 mb-1.5">
+                                    <span class="w-1.5 h-1.5 rounded-full ${(course.reviews || []).some(review => !review.completed && startOfLocalDay(new Date(review.date)) <= today) ? 'bg-amber-400' : 'bg-indigo-400'}"></span>
+                                        <span class="text-[10px] font-semibold uppercase tracking-wider text-slate-500">${(course.reviews || []).some(review => !review.completed) ? 'En progreso' : 'Completado'}</span>
+                                </div>
+                                <h3 class="font-semibold text-white text-base break-words">${escapeHtml(course.name)}</h3>
+                                <p class="text-xs text-slate-500 mt-1">Sesión · ${formatDate(course.studyDate)}</p>
+                                ${course.notes ? `<p class="text-sm leading-relaxed text-slate-300 mt-3 whitespace-pre-wrap">${escapeHtml(course.notes)}</p>` : ''}
+                            </div>
+                            <button type="button" data-course-action="delete" data-course-id="${escapeHtml(course.id)}" class="shrink-0 text-slate-500 hover:text-rose-300 hover:bg-rose-400/10 p-2 rounded-lg transition text-xs" title="Eliminar sesión" aria-label="Eliminar ${escapeHtml(course.name)}">
+                                <span aria-hidden="true">×</span>
+                            </button>
+                        </div>
+                        
+                        <div class="pt-4 border-t border-slate-800">
+                            <div class="flex items-center justify-between gap-3 mb-3">
+                                <span class="text-xs font-medium text-slate-300">Repaso espaciado</span>
+                                <span class="text-[11px] text-slate-500">${course.reviews.filter(review => review.completed).length} de ${course.reviews.length} completados</span>
+                            </div>
+                            <div class="h-1.5 bg-slate-800 rounded-full overflow-hidden mb-4" role="progressbar" aria-label="Progreso de repasos de ${escapeHtml(course.name)}" aria-valuenow="${course.reviews.filter(review => review.completed).length}" aria-valuemin="0" aria-valuemax="${course.reviews.length}">
+                                <div class="h-full bg-gradient-to-r from-indigo-500 to-emerald-400 rounded-full transition-all" style="width: ${course.reviews.length ? Math.round(course.reviews.filter(review => review.completed).length / course.reviews.length * 100) : 0}%"></div>
+                            </div>
+                            <div class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-2">
+                                ${(course.reviews || []).map(review => {
+                                    const reviewDate = new Date(review.date);
+                                    const isDue = !review.completed && startOfLocalDay(reviewDate) <= today;
+                                    const statusStyle = review.completed
+                                        ? 'bg-emerald-950/50 border-emerald-900/80 text-emerald-200'
+                                        : isDue
+                                            ? 'bg-amber-950/50 border-amber-800/70 text-amber-100'
+                                            : 'bg-slate-950/60 border-slate-800 text-slate-300';
+                                    const statusText = review.completed ? 'Listo' : isDue ? (startOfLocalDay(reviewDate).getTime() < today.getTime() ? 'Pendiente' : 'Para hoy') : 'Programado';
+                                    return `
+                                        <label class="review-card flex items-center gap-2.5 p-2.5 rounded-xl border cursor-pointer ${statusStyle}">
+                                            <input type="checkbox" ${review.completed ? 'checked' : ''}
+                                                data-course-id="${escapeHtml(course.id)}" data-review-id="${Number(review.id)}"
+                                                aria-label="${review.completed ? 'Desmarcar' : 'Marcar'} repaso de ${review.daysAfter} ${review.daysAfter === 1 ? 'día' : 'días'} para ${escapeHtml(course.name)}"
+                                                class="w-4 h-4 shrink-0 accent-indigo-400 rounded border-slate-600 bg-slate-800 cursor-pointer">
+                                            <span class="min-w-0 flex-1">
+                                                <span class="flex items-center justify-between gap-1">
+                                                    <span class="block text-xs font-semibold">Día ${review.daysAfter}</span>
+                                                    <span class="text-[9px] uppercase tracking-wide opacity-70">${statusText}</span>
+                                                </span>
+                                                <span class="block text-[10px] opacity-70 mt-1">${formatShortDate(reviewDate)}</span>
+                                            </span>
+                                        </label>
+                                    `;
+                                }).join('')}
+                            </div>
+                        </div>
+                    </article>
+                `;
+            }).join('');
+        }
+
+        function formatShortDate(date) {
+            return date.toLocaleDateString('es-ES', { day: 'numeric', month: 'short' });
+        }
+
+        function normalizeSearchText(text) {
+            return text.trim().toLocaleLowerCase('es').normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+        }
+
+        function escapeHtml(text) {
+            const map = { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;' };
+            return text.replace(/[&<>"']/g, function(m) { return map[m]; });
+        }
+    </script>
+</body>
+</html>
